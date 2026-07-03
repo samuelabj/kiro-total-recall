@@ -52,10 +52,14 @@ def get_chat_files() -> list[Path]:
 
 
 def list_ide_sessions() -> list[SessionInfo]:
-    """List all IDE sessions from .chat files."""
+    """List all IDE sessions from .chat/.json files."""
     sessions = []
     for chat_file in get_chat_files():
         try:
+            # Skip the sessions index file
+            if chat_file.name == "sessions.json":
+                continue
+
             stat = chat_file.stat()
             # Use filename (without extension) as session ID
             session_id = chat_file.stem
@@ -101,9 +105,16 @@ def load_ide_session_messages(session: SessionInfo) -> list[IndexedMessage]:
         if not msg_list and isinstance(data, list):
             msg_list = data
 
+        # Kiro server format includes workspaceDirectory at top level
+        workspace = data.get("workspaceDirectory", session.workspace) if isinstance(data, dict) else session.workspace
+
         for idx, msg in enumerate(msg_list):
             if not isinstance(msg, dict):
                 continue
+
+            # Kiro server format: history entries wrap message in {"message": {...}}
+            if "message" in msg and isinstance(msg["message"], dict):
+                msg = msg["message"]
 
             role = msg.get("role", msg.get("type", ""))
             if role not in ("user", "assistant", "human", "ai"):
@@ -128,7 +139,7 @@ def load_ide_session_messages(session: SessionInfo) -> list[IndexedMessage]:
                 IndexedMessage(
                     uuid=msg.get("id", msg.get("uuid", f"{session.session_id}-{idx}")),
                     session_id=session.session_id,
-                    workspace=session.workspace,
+                    workspace=workspace,
                     timestamp=timestamp,
                     role=role,
                     searchable_text=text,
