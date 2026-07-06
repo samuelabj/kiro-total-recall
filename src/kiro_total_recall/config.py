@@ -78,10 +78,14 @@ class IDESourceConfig:
         "~/Library/Application Support/Kiro/User/globalStorage/kiro.kiroagent/*/*.chat",
         "~/.config/Kiro/User/globalStorage/kiro.kiroagent/*/*.chat",
         "~/AppData/Roaming/Kiro/User/globalStorage/kiro.kiroagent/*/*.chat",
+        # Also match .json session files in workspace-sessions
+        "~/Library/Application Support/Kiro/User/globalStorage/kiro.kiroagent/workspace-sessions/*/*.json",
+        "~/.config/Kiro/User/globalStorage/kiro.kiroagent/workspace-sessions/*/*.json",
+        "~/AppData/Roaming/Kiro/User/globalStorage/kiro.kiroagent/workspace-sessions/*/*.json",
     ])
 
     def get_chat_files(self) -> list[Path]:
-        """Get all .chat files matching patterns."""
+        """Get all .chat/.json session files matching patterns."""
         for pattern in self.patterns:
             expanded = expand_path(pattern)
             parts = expanded.parts

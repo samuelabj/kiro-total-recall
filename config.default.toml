@@ -12,11 +12,14 @@ paths = [
 
 [sources.ide]
 enabled = true
-# Glob patterns for .chat files - first existing pattern wins
+# Glob patterns for session files - checks both .chat and workspace-sessions formats
 patterns = [
     "~/Library/Application Support/Kiro/User/globalStorage/kiro.kiroagent/*/*.chat",
     "~/.config/Kiro/User/globalStorage/kiro.kiroagent/*/*.chat",
     "~/AppData/Roaming/Kiro/User/globalStorage/kiro.kiroagent/*/*.chat",
+    "~/Library/Application Support/Kiro/User/globalStorage/kiro.kiroagent/workspace-sessions/*/*.json",
+    "~/.config/Kiro/User/globalStorage/kiro.kiroagent/workspace-sessions/*/*.json",
+    "~/AppData/Roaming/Kiro/User/globalStorage/kiro.kiroagent/workspace-sessions/*/*.json",
 ]
 
 [embedding]
