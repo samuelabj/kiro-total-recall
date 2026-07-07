@@ -28,11 +28,17 @@ threading.Thread(target=_preload_index, daemon=True).start()
 
 
 def _get_current_workspace() -> str | None:
-    """Get current workspace from environment or cwd."""
-    # Try Kiro-specific env vars (if they exist)
+    """Get current workspace from environment or cwd.
+
+    Kiro MCP servers don't receive the IDE workspace path directly,
+    so we check environment variables that can be set in the MCP config,
+    then fall back to cwd.
+    """
+    # Try Kiro-specific env vars (set manually in mcp.json config)
     for var in ("KIRO_PROJECT_DIR", "KIRO_WORKSPACE"):
         if val := os.environ.get(var):
             return val
+    # Fall back to PWD/cwd (usually the --directory of the MCP server)
     return os.environ.get("PWD") or str(Path.cwd())
 
 
