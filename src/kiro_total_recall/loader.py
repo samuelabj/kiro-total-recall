@@ -4,15 +4,19 @@ from .cli_loader import list_cli_sessions, load_cli_session_messages
 from .cli_v3_loader import list_cli_v3_sessions, load_cli_v3_session_messages
 from .config import get_config
 from .ide_loader import list_ide_sessions, load_ide_session_messages
+from .ide_v3_loader import list_ide_v3_sessions, load_ide_v3_session_messages
 from .models import IndexedMessage, SessionInfo, Source
 
 # V3 CLI sessions use a 'v3-' prefix in their message UUIDs to distinguish them.
 _V3_SESSION_IDS: set[str] = set()
 
+# IDE v3 sessions use an 'idev3-' prefix in their message UUIDs.
+_IDE_V3_SESSION_IDS: set[str] = set()
+
 
 def list_all_sessions() -> list[SessionInfo]:
     """List all sessions from enabled sources, sorted by modified time."""
-    global _V3_SESSION_IDS
+    global _V3_SESSION_IDS, _IDE_V3_SESSION_IDS
     config = get_config()
     sessions = []
 
@@ -26,6 +30,10 @@ def list_all_sessions() -> list[SessionInfo]:
     if config.ide.enabled:
         sessions.extend(list_ide_sessions())
 
+        ide_v3_sessions = list_ide_v3_sessions()
+        _IDE_V3_SESSION_IDS = {s.session_id for s in ide_v3_sessions}
+        sessions.extend(ide_v3_sessions)
+
     return sorted(sessions, key=lambda s: s.timestamp_fallback, reverse=True)
 
 
@@ -35,6 +43,8 @@ def load_session_messages(session: SessionInfo) -> list[IndexedMessage]:
         if session.session_id in _V3_SESSION_IDS:
             return load_cli_v3_session_messages(session)
         return load_cli_session_messages(session)
+    if session.session_id in _IDE_V3_SESSION_IDS:
+        return load_ide_v3_session_messages(session)
     return load_ide_session_messages(session)
 
 

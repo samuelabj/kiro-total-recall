@@ -92,6 +92,9 @@ class IDESourceConfig:
         "~/.config/Kiro/User/globalStorage/kiro.kiroagent/workspace-sessions/*/*.json",
         "~/AppData/Roaming/Kiro/User/globalStorage/kiro.kiroagent/workspace-sessions/*/*.json",
     ])
+    v3_session_dirs: list[str] = field(default_factory=lambda: [
+        "~/.kiro/sessions",
+    ])
 
     def get_chat_files(self) -> list[Path]:
         """Get all .chat/.json session files matching patterns."""
