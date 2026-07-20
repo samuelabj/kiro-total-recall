@@ -60,13 +60,22 @@ class CLISourceConfig:
     paths: list[str] = field(default_factory=lambda: [
         "~/Library/Application Support/kiro-cli/data.sqlite3",
         "~/.local/share/kiro-cli/data.sqlite3",
+        "~/AppData/Local/Kiro-Cli/data.sqlite3",
         "~/AppData/Roaming/kiro-cli/data.sqlite3",
+    ])
+    v3_paths: list[str] = field(default_factory=lambda: [
+        "~/.kiro/sessions/cli",
     ])
 
     @property
     def database_path(self) -> Path | None:
         """Get first existing database path."""
         return find_first_existing(self.paths)
+
+    @property
+    def v3_sessions_dir(self) -> Path | None:
+        """Get first existing v3 CLI sessions directory."""
+        return find_first_existing(self.v3_paths)
 
 
 @dataclass

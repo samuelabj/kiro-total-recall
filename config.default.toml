@@ -3,11 +3,16 @@
 
 [sources.cli]
 enabled = true
-# SQLite database path - first existing path wins
+# SQLite database path (v2 format) - first existing path wins
 paths = [
     "~/Library/Application Support/kiro-cli/data.sqlite3",
     "~/.local/share/kiro-cli/data.sqlite3",
+    "~/AppData/Local/Kiro-Cli/data.sqlite3",
     "~/AppData/Roaming/kiro-cli/data.sqlite3",
+]
+# v3 file-based sessions directory (kiro-cli --v3)
+v3_paths = [
+    "~/.kiro/sessions/cli",
 ]
 
 [sources.ide]
