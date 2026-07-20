@@ -48,6 +48,7 @@ kiro-total-recall/
 │   ├── cli_loader.py             # CLI v2 loader (SQLite)
 │   ├── cli_v3_loader.py          # CLI v3 loader (JSON + JSONL files)
 │   ├── ide_loader.py             # IDE loader (workspace-sessions + legacy)
+│   ├── ide_v3_loader.py          # IDE v3 loader (Kiro 1.0+ directory-based)
 │   ├── config.py                  # Configuration management
 │   └── models.py                  # Pydantic data models
 ├── config.default.toml            # Default configuration

@@ -40,10 +40,10 @@ Kiro Total Recall is an MCP (Model Context Protocol) server that provides semant
 │    - Merges sessions from all sources               │
 │    - Routes message loading to correct loader       │
 │    - Sorts sessions by recency                      │
-├─────────────┬─────────────────┬─────────────────────┤
-│ cli_loader  │ cli_v3_loader   │ ide_loader          │
-│ (SQLite v2) │ (file-based v3) │ (JSON sessions)     │
-└─────────────┴─────────────────┴─────────────────────┘
+├─────────────┬─────────────────┬──────────────────┬──────────────────┤
+│ cli_loader  │ cli_v3_loader   │ ide_loader       │ ide_v3_loader    │
+│ (SQLite v2) │ (file-based v3) │ (JSON sessions)  │ (dir-based 1.0+) │
+└─────────────┴─────────────────┴──────────────────┴──────────────────┘
 ```
 
 ## Module Responsibilities
@@ -56,7 +56,8 @@ Kiro Total Recall is an MCP (Model Context Protocol) server that provides semant
 | `loader.py` | Unified session listing and message loading across all sources. |
 | `cli_loader.py` | Reads v2 CLI sessions from SQLite (`conversations_v2` table). |
 | `cli_v3_loader.py` | Reads v3 CLI sessions from `.json` + `.jsonl` file pairs. |
-| `ide_loader.py` | Reads IDE sessions from workspace-sessions JSON and legacy hash-dir formats. |
+| `ide_loader.py` | Reads pre-1.0 IDE sessions from workspace-sessions JSON and legacy hash-dir formats. |
+| `ide_v3_loader.py` | Reads IDE 1.0+ sessions from `~/.kiro/sessions/{hash}/{id}/` directories. |
 | `config.py` | Configuration loading from TOML files with sensible defaults. |
 | `models.py` | Pydantic data models shared across all modules. |
 

@@ -277,11 +277,115 @@ Each directory contains execution files with structures like `input.data.message
 
 ---
 
+## IDE v3 — Session Directories (Kiro 1.0+)
+
+Introduced with Kiro IDE 1.0, this format replaces the workspace-sessions JSON format. Sessions are stored as directories under a workspace hash.
+
+### Location
+
+```
+~/.kiro/sessions/{workspaceHash}/{sessionId}/
+```
+
+The `workspaceHash` is a 16-character hex string derived from the workspace path. The `cli/` and `_global/` subdirectories are handled separately (CLI sessions and cross-workspace sessions respectively).
+
+### Directory Structure
+
+Each session is a directory containing:
+
+```
+~/.kiro/sessions/3058e61bffa58691/
+├── sess_41aaa543-3ebe-47ea-ade6-512d7dafa912/
+│   ├── session.json      # Session metadata
+│   ├── messages.jsonl    # Message log (append-only)
+│   ├── publish.cursor    # Byte offset cursor (ignored)
+│   └── snapshots/        # Optional snapshot directory (ignored)
+└── 00d9116d-931b-441a-9739-8b02b428caf5/
+    ├── session.json
+    └── messages.jsonl
+```
+
+Session directories may be prefixed with `sess_` or use a bare UUID.
+
+### Metadata File (`session.json`)
+
+```json
+{
+  "id": "sess_41aaa543-3ebe-47ea-ade6-512d7dafa912",
+  "workspacePaths": ["c:\\Users\\work\\source\\repos\\careerhub"],
+  "createdAt": "2026-07-20T09:23:15.123Z",
+  "lastModifiedAt": "2026-07-20T11:55:42.456Z",
+  "title": "Fix authentication flow for SSO users"
+}
+```
+
+Key fields:
+- `id` — session identifier (matches directory name)
+- `workspacePaths` — array of project directories (first entry used as workspace)
+- `createdAt` / `lastModifiedAt` — ISO 8601 timestamps
+- `title` — auto-generated from first user message
+
+### Message Log (`messages.jsonl`)
+
+Each line is a JSON object:
+
+```json
+{"id": "msg-uuid", "timestamp": "2026-07-20T09:23:20.000Z", "payload": {"type": "<type>", ...}}
+```
+
+#### Payload type: `user`
+
+```json
+{
+  "id": "abc123",
+  "timestamp": "2026-07-20T09:23:20.000Z",
+  "payload": {
+    "type": "user",
+    "content": "Fix the login redirect for SSO users"
+  }
+}
+```
+
+#### Payload type: `assistant`
+
+```json
+{
+  "id": "def456",
+  "timestamp": "2026-07-20T09:23:25.000Z",
+  "payload": {
+    "type": "assistant",
+    "content": "I'll look at the SSO callback handler...",
+    "operationType": "Say"
+  }
+}
+```
+
+#### Skipped payload types
+
+- `tool_call` — tool invocations
+- `tool_result` — tool execution outputs
+- `turn_start` / `turn_end` — turn boundaries
+- `session_metadata` — context usage metrics
+- `steering_inclusion` — steering document references
+- `session_start` — session initialization (system prompt)
+- `session_event` — lifecycle events
+- `usage_summary` — token usage
+
+### Notes
+
+- Unlike the locked `sess_*` flat files we initially expected, these are standard directories readable by any process — no exclusive lock.
+- The workspace hash mapping is not yet documented; the hash appears to be derived from the workspace path but the algorithm is internal to Kiro.
+- The `_global/` directory contains sessions not tied to a specific workspace.
+- This format coexists with the older workspace-sessions JSON format; both are indexed.
+
+---
+
 ## Summary Table
 
 | Format | Client | Storage | Location | Status |
 |--------|--------|---------|----------|--------|
 | CLI v2 | `kiro-cli` (legacy) | SQLite | `data.sqlite3` (platform-specific) | Deprecated for v3 users |
 | CLI v3 | `kiro-cli --v3` | JSON + JSONL files | `~/.kiro/sessions/cli/` | Active |
-| IDE (new) | Kiro IDE | JSON files | `workspace-sessions/{b64}/` | Active |
+| IDE v3 | Kiro IDE 1.0+ | Directory per session | `~/.kiro/sessions/{hash}/{id}/` | Active |
+| IDE (pre-1.0) | Kiro IDE | JSON files | `workspace-sessions/{b64}/` | Legacy (still indexed) |
 | IDE (legacy) | Kiro IDE | Execution files | `{md5_hash}/` | Legacy |
