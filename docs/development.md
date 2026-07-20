@@ -34,29 +34,6 @@ uv run kiro-total-recall
 
 The server communicates over stdio using the MCP protocol. It's designed to be launched by a Kiro IDE or CLI instance, not run standalone in a terminal.
 
-## Project Structure
-
-```
-kiro-total-recall/
-├── docs/                          # Documentation (you are here)
-├── src/kiro_total_recall/         # Source package
-│   ├── __init__.py                # Package init, imports main
-│   ├── server.py                  # MCP server entry point (4 search tools)
-│   ├── query.py                   # Search orchestration and filtering
-│   ├── indexer.py                 # Embedding computation and similarity search
-│   ├── loader.py                  # Unified session/message loading
-│   ├── cli_loader.py             # CLI v2 loader (SQLite)
-│   ├── cli_v3_loader.py          # CLI v3 loader (JSON + JSONL files)
-│   ├── ide_loader.py             # IDE loader (workspace-sessions + legacy)
-│   ├── ide_v3_loader.py          # IDE v3 loader (Kiro 1.0+ directory-based)
-│   ├── config.py                  # Configuration management
-│   └── models.py                  # Pydantic data models
-├── config.default.toml            # Default configuration
-├── pyproject.toml                 # Project metadata and dependencies
-├── mcp.json                       # Example MCP server config
-└── uv.lock                        # Dependency lock file
-```
-
 ## Adding a New Session Source
 
 To support a new conversation storage format:
