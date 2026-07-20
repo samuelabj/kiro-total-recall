@@ -83,6 +83,9 @@ def search_project_history(
     Use this to find workspace-specific context: past decisions, implementation
     details, bugs discussed, architecture choices in this codebase.
 
+    Both user prompts AND assistant responses are indexed and searchable.
+    Results include a "role" field ("user" or "assistant") indicating who said it.
+
     Args:
         query: Keywords or sentence describing what to find
         after: Filter to messages on/after this date (ISO 8601: "2025-01-15")
@@ -124,6 +127,9 @@ def search_global_history(
     Use this to find cross-project knowledge: user preferences, coding patterns,
     common solutions, and insights from all previous work.
 
+    Both user prompts AND assistant responses are indexed and searchable.
+    Results include a "role" field ("user" or "assistant") indicating who said it.
+
     Args:
         query: Keywords or sentence describing what to find
         after: Filter to messages on/after this date (ISO 8601: "2025-01-15")
@@ -164,6 +170,9 @@ def search_cli_history(
 
     Use this to find conversations from Kiro CLI sessions specifically.
 
+    Both user prompts AND assistant responses are indexed and searchable.
+    Results include a "role" field ("user" or "assistant") indicating who said it.
+
     Args:
         query: Keywords or sentence describing what to find
         after: Filter to messages on/after this date (ISO 8601)
@@ -203,6 +212,9 @@ def search_ide_history(
     Search Kiro IDE conversation history only.
 
     Use this to find conversations from Kiro IDE sessions specifically.
+
+    Both user prompts AND assistant responses are indexed and searchable.
+    Results include a "role" field ("user" or "assistant") indicating who said it.
 
     Args:
         query: Keywords or sentence describing what to find
