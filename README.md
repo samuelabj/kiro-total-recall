@@ -17,7 +17,7 @@ Ever told Kiro "like we discussed yesterday" only to realize... it has no idea?
 ### As a Kiro Power (Recommended, IDE only)
 
 1. In Kiro IDE: Powers panel → **Add power from GitHub**
-2. Enter: `https://github.com/danilop/kiro-total-recall`
+2. Enter: `https://github.com/samuelabj/kiro-total-recall`
 3. The power activates automatically when you mention "recall", "remember", or "past conversation"
 
 ### Manual MCP Setup (CLI and IDE)
@@ -29,7 +29,7 @@ Add to `~/.kiro/settings/mcp.json` (this config is shared by both CLI and IDE):
   "mcpServers": {
     "total-recall": {
       "command": "uvx",
-      "args": ["--from", "git+https://github.com/danilop/kiro-total-recall", "kiro-total-recall"]
+      "args": ["--from", "git+https://github.com/samuelabj/kiro-total-recall", "kiro-total-recall"]
     }
   }
 }
