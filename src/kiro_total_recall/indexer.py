@@ -21,6 +21,7 @@ from .config import (
     MEMORY_LIMIT_ENV,
     get_config,
 )
+from .external_store import load_external_messages, save_messages
 from .loader import list_all_sessions, load_messages_for_sessions
 from .models import IndexedMessage, SessionInfo, Source
 
@@ -204,6 +205,12 @@ class ConversationIndex:
 
         self._messages = load_messages_for_sessions(selected)
 
+        # Load external messages (always included, not subject to memory limits)
+        external_messages = load_external_messages()
+        if external_messages:
+            self._messages.extend(external_messages)
+            print(f"[Total Recall] Loaded {len(external_messages)} external messages.")
+
         if not self._messages:
             print("[Total Recall] No messages found.")
             self._embeddings = np.array([])
@@ -213,7 +220,8 @@ class ConversationIndex:
         # Count messages by source
         cli_msgs = sum(1 for m in self._messages if m.source == Source.CLI)
         ide_msgs = sum(1 for m in self._messages if m.source == Source.IDE)
-        print(f"[Total Recall] Loaded {len(self._messages)} messages (CLI: {cli_msgs}, IDE: {ide_msgs})")
+        ext_msgs = sum(1 for m in self._messages if m.source == Source.EXTERNAL)
+        print(f"[Total Recall] Loaded {len(self._messages)} messages (CLI: {cli_msgs}, IDE: {ide_msgs}, External: {ext_msgs})")
 
         cache = self._load_cache()
         self._text_hashes = []
@@ -274,6 +282,72 @@ class ConversationIndex:
         """Ensure index is built and up-to-date."""
         if self._embeddings is None or self.needs_rebuild():
             self.build_index()
+
+    def ingest_messages(self, messages: list[IndexedMessage]) -> int:
+        """Ingest external messages into the live index and persist them.
+
+        Messages are persisted to disk so they survive index rebuilds.
+        Returns the number of new messages added.
+        """
+        # Persist to external store
+        saved_count = save_messages(messages)
+        if saved_count == 0:
+            return 0
+
+        # Ensure base index exists
+        self.ensure_index()
+
+        # Filter to only truly new messages (not already in index)
+        existing_uuids = {m.uuid for m in self._messages}
+        new_messages = [m for m in messages if m.uuid not in existing_uuids]
+        if not new_messages:
+            return saved_count
+
+        # Embed new messages
+        texts = [m.searchable_text for m in new_messages]
+        cache = self._load_cache()
+        new_embeddings = np.zeros((len(new_messages), EMBEDDING_DIM), dtype=np.float32)
+        texts_to_embed = []
+        indices_to_embed = []
+        new_hashes = []
+
+        for i, text in enumerate(texts):
+            text_hash = self._compute_text_hash(text)
+            new_hashes.append(text_hash)
+            if text_hash in cache:
+                new_embeddings[i] = cache[text_hash]
+            else:
+                texts_to_embed.append(text)
+                indices_to_embed.append(i)
+
+        new_cache = {}
+        if texts_to_embed:
+            batch_embeddings = self.model.encode(
+                texts_to_embed,
+                show_progress_bar=False,
+                convert_to_numpy=True,
+                normalize_embeddings=True,
+            )
+            for i, idx in enumerate(indices_to_embed):
+                new_embeddings[idx] = batch_embeddings[i]
+                new_cache[new_hashes[idx]] = batch_embeddings[i]
+
+        if new_cache:
+            self._save_cache(new_cache)
+
+        # Append to live index
+        self._messages.extend(new_messages)
+        self._text_hashes.extend(new_hashes)
+        if self._embeddings is not None and len(self._embeddings) > 0:
+            self._embeddings = np.vstack([self._embeddings, new_embeddings])
+        else:
+            self._embeddings = new_embeddings
+
+        # Rebuild metadata indices
+        self._build_metadata_indices()
+
+        print(f"[Total Recall] Ingested {saved_count} external messages.")
+        return saved_count
 
     def search(
         self,

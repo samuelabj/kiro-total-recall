@@ -11,6 +11,7 @@ class Source(str, Enum):
 
     CLI = "cli"
     IDE = "ide"
+    EXTERNAL = "external"
 
 
 class IndexedMessage(BaseModel):

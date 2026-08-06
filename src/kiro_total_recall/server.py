@@ -1,16 +1,18 @@
-"""FastMCP server for Kiro Total Recall."""
+"""MCP server for Kiro Total Recall."""
 
 import os
 import threading
+import uuid
+from datetime import datetime
 from pathlib import Path
 
-from mcp.server.fastmcp import FastMCP
+from mcp.server.mcpserver import MCPServer
 
 from .indexer import get_index
-from .models import Source
+from .models import IndexedMessage, Source
 from .query import search_conversations
 
-mcp = FastMCP("kiro-total-recall")
+mcp = MCPServer("kiro-total-recall")
 
 
 def _preload_index():
@@ -239,6 +241,92 @@ def search_ide_history(
         max_results=max_results,
         offset=offset,
     )
+
+
+@mcp.tool()
+def ingest_content(
+    messages: list[dict],
+    session_id: str | None = None,
+    workspace: str | None = None,
+) -> dict:
+    """
+    Manually index external content into Total Recall for future search.
+
+    Use this to ingest conversations or content from external sources (e.g.,
+    other AI tools, exported chat logs, documentation) so they become
+    searchable alongside Kiro IDE/CLI history.
+
+    Messages are persisted to disk and survive server restarts.
+
+    Args:
+        messages: List of message objects, each with:
+            - content (required): The text content to index
+            - role (optional): "user" or "assistant" (default: "user")
+            - timestamp (optional): ISO 8601 datetime (default: now)
+        session_id: Group messages under this session ID (default: auto-generated)
+        workspace: Workspace/project path to associate with (default: current workspace)
+
+    Returns:
+        Summary of ingestion: count of messages added, session_id used
+
+    Example:
+        ingest_content(
+            messages=[
+                {"content": "How do I use the Bond API?", "role": "user", "timestamp": "2026-05-06T10:15:00"},
+                {"content": "The Bond API uses PUT requests to trigger actions...", "role": "assistant", "timestamp": "2026-05-06T10:15:30"}
+            ],
+            session_id="antigravity-52456d3d",
+            workspace="/home/sam"
+        )
+    """
+    if not messages:
+        return {"success": False, "error": "No messages provided"}
+
+    # Resolve defaults
+    resolved_session_id = session_id or f"ext-{uuid.uuid4().hex[:12]}"
+    resolved_workspace = workspace or _get_current_workspace() or ""
+
+    # Build IndexedMessage objects
+    indexed_messages = []
+    for i, msg in enumerate(messages):
+        content = msg.get("content")
+        if not content or not content.strip():
+            continue
+
+        role = msg.get("role", "user")
+        ts_str = msg.get("timestamp")
+        try:
+            timestamp = datetime.fromisoformat(ts_str) if ts_str else datetime.now()
+        except (ValueError, TypeError):
+            timestamp = datetime.now()
+
+        msg_uuid = f"ext-{resolved_session_id}-{uuid.uuid4().hex[:8]}"
+
+        indexed_messages.append(IndexedMessage(
+            uuid=msg_uuid,
+            session_id=resolved_session_id,
+            workspace=resolved_workspace,
+            timestamp=timestamp,
+            role=role,
+            searchable_text=content.strip(),
+            message_index=i,
+            source=Source.EXTERNAL,
+        ))
+
+    if not indexed_messages:
+        return {"success": False, "error": "No valid messages with content"}
+
+    # Ingest into the live index
+    index = get_index()
+    added = index.ingest_messages(indexed_messages)
+
+    return {
+        "success": True,
+        "messages_ingested": added,
+        "messages_submitted": len(indexed_messages),
+        "session_id": resolved_session_id,
+        "workspace": resolved_workspace,
+    }
 
 
 def main():
