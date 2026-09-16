@@ -8,6 +8,7 @@ import os
 import pickle
 import platform
 import subprocess
+import sys
 from datetime import datetime
 
 import numpy as np
@@ -26,6 +27,40 @@ from .loader import list_all_sessions, load_messages_for_sessions
 from .models import IndexedMessage, SessionInfo, Source
 
 logger = logging.getLogger(__name__)
+
+
+@functools.lru_cache(maxsize=256)
+def _git_repo_identity(path: str) -> str:
+    """Resolve a path to an identity shared by every worktree of its repo.
+
+    `git worktree`s each have their own working directory but share one
+    underlying .git directory (`git rev-parse --git-common-dir` resolves to
+    it from any of them). Using that as the identity means project-scoped
+    search finds history from a different worktree of the same repo, not
+    just the exact folder the query happened to run from.
+
+    Falls back to the input path unchanged if it isn't inside a git
+    repository, git isn't available, or the path no longer exists (e.g. a
+    worktree that's since been removed) — those still get an exact-path
+    comparison, same as before this existed.
+    """
+    if not path:
+        return path
+    try:
+        result = subprocess.run(
+            ["git", "-C", path, "rev-parse", "--git-common-dir"],
+            capture_output=True,
+            text=True,
+            timeout=3,
+        )
+        if result.returncode != 0:
+            return path
+        common_dir = result.stdout.strip()
+        if not common_dir:
+            return path
+        return os.path.normcase(os.path.abspath(os.path.join(path, common_dir)))
+    except (OSError, subprocess.SubprocessError):
+        return path
 
 
 def get_physical_memory() -> int:
@@ -126,9 +161,9 @@ class ConversationIndex:
             from sentence_transformers import SentenceTransformer
 
             config = get_config()
-            print(f"[Total Recall] Loading embedding model '{config.embedding.model}'...")
+            print(f"[Total Recall] Loading embedding model '{config.embedding.model}'...", file=sys.stderr)
             self._model = SentenceTransformer(config.embedding.model)
-            print(f"[Total Recall] Model loaded.")
+            print(f"[Total Recall] Model loaded.", file=sys.stderr)
         return self._model
 
     def _compute_text_hash(self, text: str) -> str:
@@ -201,7 +236,7 @@ class ConversationIndex:
         # Count sessions by source
         cli_sessions = [s for s in selected if s.source == Source.CLI]
         ide_sessions = [s for s in selected if s.source == Source.IDE]
-        print(f"[Total Recall] Loading messages: {len(cli_sessions)} CLI sessions, {len(ide_sessions)} IDE sessions...")
+        print(f"[Total Recall] Loading messages: {len(cli_sessions)} CLI sessions, {len(ide_sessions)} IDE sessions...", file=sys.stderr)
 
         self._messages = load_messages_for_sessions(selected)
 
@@ -209,10 +244,10 @@ class ConversationIndex:
         external_messages = load_external_messages()
         if external_messages:
             self._messages.extend(external_messages)
-            print(f"[Total Recall] Loaded {len(external_messages)} external messages.")
+            print(f"[Total Recall] Loaded {len(external_messages)} external messages.", file=sys.stderr)
 
         if not self._messages:
-            print("[Total Recall] No messages found.")
+            print("[Total Recall] No messages found.", file=sys.stderr)
             self._embeddings = np.array([])
             self._text_hashes = []
             return
@@ -221,7 +256,7 @@ class ConversationIndex:
         cli_msgs = sum(1 for m in self._messages if m.source == Source.CLI)
         ide_msgs = sum(1 for m in self._messages if m.source == Source.IDE)
         ext_msgs = sum(1 for m in self._messages if m.source == Source.EXTERNAL)
-        print(f"[Total Recall] Loaded {len(self._messages)} messages (CLI: {cli_msgs}, IDE: {ide_msgs}, External: {ext_msgs})")
+        print(f"[Total Recall] Loaded {len(self._messages)} messages (CLI: {cli_msgs}, IDE: {ide_msgs}, External: {ext_msgs})", file=sys.stderr)
 
         cache = self._load_cache()
         self._text_hashes = []
@@ -244,11 +279,11 @@ class ConversationIndex:
                 cached_count += 1
 
         if cached_count > 0:
-            print(f"[Total Recall] Loaded {cached_count} cached embeddings.")
+            print(f"[Total Recall] Loaded {cached_count} cached embeddings.", file=sys.stderr)
 
         new_cache = {}
         if texts_to_embed:
-            print(f"[Total Recall] Embedding {len(texts_to_embed)} new messages...")
+            print(f"[Total Recall] Embedding {len(texts_to_embed)} new messages...", file=sys.stderr)
             batch_size = 100
             for batch_start in range(0, len(texts_to_embed), batch_size):
                 batch_end = min(batch_start + batch_size, len(texts_to_embed))
@@ -267,16 +302,16 @@ class ConversationIndex:
                     new_cache[self._text_hashes[idx]] = batch_embeddings[i]
 
                 if batch_end < len(texts_to_embed):
-                    print(f"[Total Recall] Embedded {batch_end}/{len(texts_to_embed)} messages...")
+                    print(f"[Total Recall] Embedded {batch_end}/{len(texts_to_embed)} messages...", file=sys.stderr)
 
-            print(f"[Total Recall] Embedding complete. Saving cache...")
+            print(f"[Total Recall] Embedding complete. Saving cache...", file=sys.stderr)
 
         if new_cache:
             self._save_cache(new_cache)
-            print(f"[Total Recall] Cache saved ({len(new_cache)} new embeddings).")
+            print(f"[Total Recall] Cache saved ({len(new_cache)} new embeddings).", file=sys.stderr)
 
         self._build_metadata_indices()
-        print(f"[Total Recall] Index ready.")
+        print(f"[Total Recall] Index ready.", file=sys.stderr)
 
     def ensure_index(self):
         """Ensure index is built and up-to-date."""
@@ -346,7 +381,7 @@ class ConversationIndex:
         # Rebuild metadata indices
         self._build_metadata_indices()
 
-        print(f"[Total Recall] Ingested {saved_count} external messages.")
+        print(f"[Total Recall] Ingested {saved_count} external messages.", file=sys.stderr)
         return saved_count
 
     def search(
@@ -398,8 +433,15 @@ class ConversationIndex:
             global_idx = candidate_indices[local_idx]
             msg = self._messages[global_idx]
 
-            # Apply filters
-            if workspace and not msg.workspace.startswith(workspace):
+            # Apply filters. Windows paths are case-insensitive but may be
+            # recorded with inconsistent drive-letter casing across tools
+            # (PowerShell vs. bash vs. the JSONL transcript itself), so
+            # compare case-normalized. A message also counts as in-workspace
+            # if it comes from a different worktree of the same git repo.
+            if workspace and not (
+                os.path.normcase(msg.workspace).startswith(os.path.normcase(workspace))
+                or _git_repo_identity(msg.workspace) == _git_repo_identity(workspace)
+            ):
                 continue
             if source and msg.source != source:
                 continue
