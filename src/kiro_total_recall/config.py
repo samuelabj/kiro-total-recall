@@ -120,6 +120,37 @@ class IDESourceConfig:
 
 
 @dataclass
+class ClaudeSourceConfig:
+    """Claude Code source configuration."""
+
+    enabled: bool = True
+    patterns: list[str] = field(default_factory=lambda: [
+        "~/.claude/projects/*/*.jsonl",
+    ])
+
+    def get_transcript_files(self) -> list[Path]:
+        """Get all session transcript files matching patterns."""
+        files: list[Path] = []
+        for pattern in self.patterns:
+            expanded = expand_path(pattern)
+            parts = expanded.parts
+            parent_parts = []
+            glob_pattern_parts = []
+            in_glob = False
+            for part in parts:
+                if "*" in part or in_glob:
+                    in_glob = True
+                    glob_pattern_parts.append(part)
+                else:
+                    parent_parts.append(part)
+            parent = Path(*parent_parts) if parent_parts else Path(".")
+            glob_pattern = str(Path(*glob_pattern_parts)) if glob_pattern_parts else "*"
+            if parent.exists():
+                files.extend(parent.glob(glob_pattern))
+        return files
+
+
+@dataclass
 class EmbeddingConfig:
     """Embedding configuration."""
 
@@ -162,6 +193,7 @@ class Config:
 
     cli: CLISourceConfig = field(default_factory=CLISourceConfig)
     ide: IDESourceConfig = field(default_factory=IDESourceConfig)
+    claude: ClaudeSourceConfig = field(default_factory=ClaudeSourceConfig)
     embedding: EmbeddingConfig = field(default_factory=EmbeddingConfig)
     search: SearchConfig = field(default_factory=SearchConfig)
     memory: MemoryConfig = field(default_factory=MemoryConfig)
@@ -171,6 +203,7 @@ class Config:
         """Create config from dictionary."""
         cli_data = data.get("sources", {}).get("cli", {})
         ide_data = data.get("sources", {}).get("ide", {})
+        claude_data = data.get("sources", {}).get("claude", {})
         emb_data = data.get("embedding", {})
         search_data = data.get("search", {})
         mem_data = data.get("memory", {})
@@ -178,6 +211,7 @@ class Config:
         return cls(
             cli=CLISourceConfig(**cli_data) if cli_data else CLISourceConfig(),
             ide=IDESourceConfig(**ide_data) if ide_data else IDESourceConfig(),
+            claude=ClaudeSourceConfig(**claude_data) if claude_data else ClaudeSourceConfig(),
             embedding=EmbeddingConfig(**emb_data) if emb_data else EmbeddingConfig(),
             search=SearchConfig(**search_data) if search_data else SearchConfig(),
             memory=MemoryConfig(**mem_data) if mem_data else MemoryConfig(),

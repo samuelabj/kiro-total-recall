@@ -1,5 +1,6 @@
 """Unified loader combining CLI (v2 + v3) and IDE sources."""
 
+from .claude_loader import list_claude_sessions, load_claude_session_messages
 from .cli_loader import list_cli_sessions, load_cli_session_messages
 from .cli_v3_loader import list_cli_v3_sessions, load_cli_v3_session_messages
 from .config import get_config
@@ -13,10 +14,14 @@ _V3_SESSION_IDS: set[str] = set()
 # IDE v3 sessions use an 'idev3-' prefix in their message UUIDs.
 _IDE_V3_SESSION_IDS: set[str] = set()
 
+# Claude Code sessions, tracked separately since their real source (CLI vs
+# IDE) is only known per-message, not per-session.
+_CLAUDE_SESSION_IDS: set[str] = set()
+
 
 def list_all_sessions() -> list[SessionInfo]:
     """List all sessions from enabled sources, sorted by modified time."""
-    global _V3_SESSION_IDS, _IDE_V3_SESSION_IDS
+    global _V3_SESSION_IDS, _IDE_V3_SESSION_IDS, _CLAUDE_SESSION_IDS
     config = get_config()
     sessions = []
 
@@ -34,11 +39,17 @@ def list_all_sessions() -> list[SessionInfo]:
         _IDE_V3_SESSION_IDS = {s.session_id for s in ide_v3_sessions}
         sessions.extend(ide_v3_sessions)
 
+    claude_sessions = list_claude_sessions()
+    _CLAUDE_SESSION_IDS = {s.session_id for s in claude_sessions}
+    sessions.extend(claude_sessions)
+
     return sorted(sessions, key=lambda s: s.timestamp_fallback, reverse=True)
 
 
 def load_session_messages(session: SessionInfo) -> list[IndexedMessage]:
     """Load messages for a session based on its source."""
+    if session.session_id in _CLAUDE_SESSION_IDS:
+        return load_claude_session_messages(session)
     if session.source == Source.CLI:
         if session.session_id in _V3_SESSION_IDS:
             return load_cli_v3_session_messages(session)

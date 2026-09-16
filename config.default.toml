@@ -27,6 +27,13 @@ patterns = [
     "~/AppData/Roaming/Kiro/User/globalStorage/kiro.kiroagent/workspace-sessions/*/*.json",
 ]
 
+[sources.claude]
+enabled = true
+# Claude Code session transcripts (same location on every OS)
+patterns = [
+    "~/.claude/projects/*/*.jsonl",
+]
+
 [embedding]
 model = "all-MiniLM-L6-v2"
 cache_dir = "~/.cache/kiro-total-recall"
